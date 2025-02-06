@@ -5,7 +5,7 @@ A Retrieval-Augmented Generation (RAG) system that allows users to upload docume
 ## Features
 
 - Document upload support (TXT, PDF, CSV)
-- Intelligent text chunking and embedding
+- Intelligent text chunking and embedding (Coming soon)
 - AI-powered question answering using Anthropic's Claude
 - Interactive chat interface
 - Document context retrieval
@@ -34,8 +34,11 @@ ANTHROPIC_API_KEY=your-api-key-here
 ```bash
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
-
-2. Run the Streamlit app:
+2. Run the watchdog for the document embedding:
+```bash
+python src/document_watcher.py
+```
+3. Run the Streamlit app:
 ```bash
 streamlit run src/app.py
 ```
@@ -57,16 +60,16 @@ streamlit run src/app.py
 
 ```
 .
-├── src/                    # Source code directory
-│   ├── app.py             # Streamlit web interface
-│   ├── anthropic_rag.py   # RAG implementation with Claude
-│   ├── chroma_manager.py  # Vector database management
-│   ├── document_watcher.py # File monitoring service
+├── src/                     # Source code directory
+│   ├── app.py               # Streamlit web interface
+│   ├── anthropic_rag.py     # RAG implementation with Claude
+│   ├── chroma_manager.py    # Vector database management
+│   ├── document_watcher.py  # File monitoring service
 │   └── embedding_manager.py # Document processing
-├── Docs/                   # Directory for documents to be processed
-├── requirements.txt        # Project dependencies
-├── .env                   # Environment variables (gitignored)
-└── .gitignore            # Git ignore rules
+├── Docs/                    # Directory for documents to be processed
+├── requirements.txt         # Project dependencies
+├── .env                     # Environment variables (gitignored)
+└── .gitignore               # Git ignore rules
 ```
 
 ## Development
