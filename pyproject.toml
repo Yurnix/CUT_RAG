@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "cut-rag"
+version = "0.1.0"
+description = ""
+authors = ["Yurnix"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+streamlit = "^1.42.0"
+python-dotenv = "^1.0.1"
+anthropic = "^0.45.2"
+chromadb = "^0.6.3"
+pypdf = "^5.2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

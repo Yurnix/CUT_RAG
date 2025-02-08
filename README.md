@@ -12,15 +12,15 @@ A Retrieval-Augmented Generation (RAG) system that allows users to upload docume
 
 ## Setup
 
-1. Create a virtual environment and activate it:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+1. Install main dependencies: 
+   - Python 3.12 
+   - [Poetry](https://python-poetry.org/docs/#installation)
 
-2. Install requirements:
+
+2. Install project dependencies in project:
 ```bash
-pip install -r requirements.txt
+export POETRY_VIRTUALENVS_IN_PROJECT=true
+poetry install --no-root
 ```
 
 3. Create a `.env` file in the root directory and add your Anthropic API key (this file is gitignored):
@@ -32,7 +32,7 @@ ANTHROPIC_API_KEY=your-api-key-here
 
 1. Activate the virtual environment:
 ```bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source .venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 2. Run the watchdog for the document embedding:
 ```bash
