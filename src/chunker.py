@@ -36,14 +36,49 @@ class Chunker:
         Returns:
             List[str]: List of text chunks
         """
-        # Tokenize the text
-        tokens = self.tokenizer.encode(text)
         chunks = []
+        max_length = self.tokenizer.model_max_length
         
-        # Calculate effective chunk size considering stride
+        # Process text in segments that fit within model's max length
+        sentences = text.split('. ')
+        current_segment = ""
+        current_tokens = []
+        
+        for sentence in sentences:
+            # Add period back if this isn't the last sentence
+            sentence = sentence.strip() + '. '
+            
+            # Tokenize the new sentence
+            new_tokens = self.tokenizer.encode(sentence, add_special_tokens=False)
+            
+            # If adding new sentence would exceed max length, process current segment
+            if len(current_tokens) + len(new_tokens) > max_length:
+                if current_tokens:
+                    # Process current segment into chunks
+                    segment_chunks = self._chunk_tokens(current_tokens, chunk_size, stride)
+                    chunks.extend(segment_chunks)
+                    
+                # Start new segment
+                current_tokens = new_tokens
+                current_segment = sentence
+            else:
+                current_tokens.extend(new_tokens)
+                current_segment += sentence
+        
+        # Process the last segment if it exists
+        if current_tokens:
+            segment_chunks = self._chunk_tokens(current_tokens, chunk_size, stride)
+            chunks.extend(segment_chunks)
+            
+        return chunks
+        
+    def _chunk_tokens(self, tokens: List[int], chunk_size: int, stride: int) -> List[str]:
+        """
+        Helper method to chunk a list of tokens into overlapping chunks.
+        """
+        chunks = []
         effective_chunk_size = chunk_size - stride
         
-        # Split tokens into chunks
         for i in range(0, len(tokens), effective_chunk_size):
             # Get chunk tokens
             chunk_tokens = tokens[i:i + chunk_size]

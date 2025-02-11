@@ -9,11 +9,14 @@ from embedding_manager import EmbeddingManager
 import statistics
 
 """
+Note: The warning about PyTorch/TensorFlow not being found can be safely ignored
+as we only use the tokenizer functionality, not the full model capabilities.
+
 Accepts the following arguments:
     * input_file: Path to the input file (supports txt, pdf, csv)
     * output_dir: Directory where chunked results will be saved
-    * --chunk-size: Maximum chunk size in tokens (default: 512)
-    * --stride: Stride for sliding window chunking (default: 256)
+    * --chunk-size: Maximum chunk size in tokens (default: 256)
+    * --stride: Stride for sliding window chunking (default: 128)
     * --num-topics: Number of topics for topic-based chunking (default: 5)
 
 For each chunking method, it generates:
@@ -26,7 +29,7 @@ Usage example:
     ./src/test_chunker.py input.txt output_chunks/
 
 # With custom parameters
-    ./src/test_chunker.py input.pdf output_chunks/ --chunk-size 1024 --stride 512 --num-topics 3
+    ./src/test_chunker.py input.pdf output_chunks/ --chunk-size 512 --stride 256 --num-topics 3
 
 The script will create:
     * {filename}_fixed_length_chunks.txt
@@ -40,7 +43,6 @@ Each output file includes:
     * Chunk statistics (number of chunks, average length, etc.)
     * Individual chunks with clear separators
     * A summary report comparing all methods
-
 """
 
 def create_output_directory(output_dir: str) -> None:
@@ -73,15 +75,22 @@ def write_chunks_to_file(chunks: List[str], output_path: str, stats: Dict) -> No
             f.write(chunk)
             f.write("\n\n")
 
+def write_plain_text_into_file(text: str, base_filename: str, output_dir: str) -> None:
+    """Write plain text into a file."""
+    output_file = os.path.join(output_dir, f"{base_filename}_plain_text.txt")
+
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(text)
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Test different text chunking methods')
     parser.add_argument('input_file', help='Path to input file (txt, pdf, or csv)')
     parser.add_argument('output_dir', help='Directory to save chunked outputs')
-    parser.add_argument('--chunk-size', type=int, default=512,
-                      help='Maximum chunk size in tokens (default: 512)')
-    parser.add_argument('--stride', type=int, default=256,
-                      help='Stride for sliding window chunking (default: 256)')
+    parser.add_argument('--chunk-size', type=int, default=256,
+                      help='Maximum chunk size in tokens (default: 256)')
+    parser.add_argument('--stride', type=int, default=128,
+                      help='Stride for sliding window chunking (default: 128)')
     parser.add_argument('--num-topics', type=int, default=5,
                       help='Number of topics for topic-based chunking (default: 5)')
     
@@ -102,15 +111,17 @@ def main():
         text = em.parse_file(args.input_file)
     except Exception as e:
         raise ValueError(f"Error parsing file: {str(e)}")
-    
+        
     # Initialize chunker
     chunker = Chunker()
     
     # Process text with each chunking method
     results = {}
     base_filename = os.path.splitext(os.path.basename(args.input_file))[0]
+    write_plain_text_into_file(text, base_filename, args.output_dir)
     
     for method in ChunkingMethod:
+        print(f"\nProcessing {method.value} chunking method...")
         # Get chunks using current method
         chunks = chunker.chunk_text(
             text,
