@@ -7,7 +7,7 @@ from chroma_manager import ChromaManager
 class AnthropicRAG:
     def __init__(self, 
                 chroma_manager: Optional[ChromaManager] = None,
-                model: str = "claude-3-sonnet-20240229", # claude-3-opus-20240229 -> top & expensive | claude-3-5-sonnet-20241022 bit more accurate than 3
+                model: str = "claude-3-5-sonnet-20241022", # "claude-3-sonnet-20240229", # claude-3-opus-20240229 -> top & expensive | claude-3-5-sonnet-20241022 bit more accurate than 3
                 max_tokens: int = 1024,
                 temperature: float = 0.7,
                 context_limit: int = 5):
@@ -88,14 +88,17 @@ class AnthropicRAG:
         # Prepare system prompt
         if system_prompt is None:
             system_prompt = """You are a helpful AI assistant. Use the provided context to answer the user's question.
-            If the context doesn't contain relevant information, say so. Always base your answers on the provided context."""
+            If the context doesn't contain relevant information, say so. Always base your answers on the provided context.
+            If the context has the source name and maybe page number, mention it at the end of your response.
+            Your response must be in streamlit markdown format."""
         
         # Create message for the conversation
         message = f"""Context:
         {context}
         
         Question: {user_query}"""
-        
+        print("#########################################################\n")
+        print(message)
         # Generate response
         response = self.client.messages.create(
             model=self.model,
@@ -105,4 +108,6 @@ class AnthropicRAG:
             temperature=self.temperature
         )
         
+        print("#########################################################\n")
+        print(response.content[0].text)
         return response.content[0].text
