@@ -7,7 +7,7 @@ from chroma_manager import ChromaManager
 class AnthropicRAG:
     def __init__(self, 
                 chroma_manager: Optional[ChromaManager] = None,
-                model: str = "claude-3-opus-20240229",
+                model: str = "claude-3-sonnet-20240229", # claude-3-opus-20240229 -> top & expensive | claude-3-5-sonnet-20241022 bit more accurate than 3
                 max_tokens: int = 1024,
                 temperature: float = 0.7,
                 context_limit: int = 5):

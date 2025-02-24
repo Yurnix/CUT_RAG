@@ -3,18 +3,23 @@ import os
 from pypdf import PdfReader
 import pandas as pd
 from chroma_manager import ChromaManager
+from chunker import Chunker, ChunkingMethod
 
 class EmbeddingManager:
-    def __init__(self, chroma_manager: Optional[ChromaManager] = None, symbol_threshold: int = 512):
+    def __init__(self, chroma_manager: Optional[ChromaManager] = None, 
+                 chunk_size: int = 512, chunking_method: ChunkingMethod = ChunkingMethod.FIXED_LENGTH):
         """
-        Initialize EmbeddingManager with optional ChromaManager instance and symbol threshold.
+        Initialize EmbeddingManager with optional ChromaManager instance and chunking parameters.
         
         Args:
             chroma_manager (Optional[ChromaManager]): ChromaManager instance. If None, creates a new one
-            symbol_threshold (int): Maximum number of symbols per chunk
+            chunk_size (int): Maximum size of each chunk in tokens
+            chunking_method (ChunkingMethod): Method to use for text chunking
         """
         self.chroma_manager = chroma_manager or ChromaManager()
-        self.symbol_threshold = symbol_threshold
+        self.chunk_size = chunk_size
+        self.chunking_method = chunking_method
+        self.chunker = Chunker()
     
     def parse_file(self, filepath: str) -> str:
         """
@@ -56,7 +61,7 @@ class EmbeddingManager:
     
     def chunk_text(self, text: str) -> List[str]:
         """
-        Split text into chunks based on symbol threshold.
+        Split text into chunks using the specified chunking method.
         
         Args:
             text (str): Text to chunk
@@ -64,28 +69,7 @@ class EmbeddingManager:
         Returns:
             List[str]: List of text chunks
         """
-        chunks = []
-        current_chunk = ""
-        
-        # Split text into sentences (simple approach)
-        sentences = text.replace('\n', ' ').split('.')
-        
-        for sentence in sentences:
-            sentence = sentence.strip() + '.'  # Add back the period
-            
-            # If current chunk plus new sentence exceeds threshold, save current chunk
-            if len(current_chunk) + len(sentence) > self.symbol_threshold:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = sentence
-            else:
-                current_chunk += ' ' + sentence if current_chunk else sentence
-        
-        # Add the last chunk if it exists
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-            
-        return chunks
+        return self.chunker.chunk_text(text, method=self.chunking_method, chunk_size=self.chunk_size)
     
     def add_file(self, filepath: str, metadata: Optional[Dict[str, Any]] = None) -> List[str]:
         """
