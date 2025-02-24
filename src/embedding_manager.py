@@ -3,18 +3,23 @@ import os
 from pypdf import PdfReader
 import pandas as pd
 from chroma_manager import ChromaManager
+from chunker import Chunker, ChunkingMethod
 
 class EmbeddingManager:
-    def __init__(self, chroma_manager: Optional[ChromaManager] = None, symbol_threshold: int = 512):
+    def __init__(self, chroma_manager: Optional[ChromaManager] = None, 
+                 chunk_size: int = 512, chunking_method: ChunkingMethod = ChunkingMethod.FIXED_LENGTH):
         """
-        Initialize EmbeddingManager with optional ChromaManager instance and symbol threshold.
+        Initialize EmbeddingManager with optional ChromaManager instance and chunking parameters.
         
         Args:
             chroma_manager (Optional[ChromaManager]): ChromaManager instance. If None, creates a new one
-            symbol_threshold (int): Maximum number of symbols per chunk
+            chunk_size (int): Maximum size of each chunk in tokens
+            chunking_method (ChunkingMethod): Method to use for text chunking
         """
         self.chroma_manager = chroma_manager or ChromaManager()
-        self.symbol_threshold = symbol_threshold
+        self.chunk_size = chunk_size
+        self.chunking_method = chunking_method
+        self.chunker = Chunker()
     
     def parse_file(self, filepath: str) -> str:
         """
@@ -43,7 +48,9 @@ class EmbeddingManager:
             with open(filepath, 'rb') as file:
                 pdf = PdfReader(file)
                 for page in pdf.pages:
-                    text += page.extract_text() + "\n"
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
             return text
             
         elif file_extension == '.csv':
@@ -56,7 +63,7 @@ class EmbeddingManager:
     
     def chunk_text(self, text: str) -> List[str]:
         """
-        Split text into chunks based on symbol threshold.
+        Split text into chunks using the specified chunking method.
         
         Args:
             text (str): Text to chunk
@@ -64,45 +71,31 @@ class EmbeddingManager:
         Returns:
             List[str]: List of text chunks
         """
-        chunks = []
-        current_chunk = ""
-        
-        # Split text into sentences (simple approach)
-        sentences = text.replace('\n', ' ').split('.')
-        
-        for sentence in sentences:
-            sentence = sentence.strip() + '.'  # Add back the period
-            
-            # If current chunk plus new sentence exceeds threshold, save current chunk
-            if len(current_chunk) + len(sentence) > self.symbol_threshold:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = sentence
-            else:
-                current_chunk += ' ' + sentence if current_chunk else sentence
-        
-        # Add the last chunk if it exists
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-            
-        return chunks
+        return self.chunker.chunk_text(text, method=self.chunking_method, chunk_size=self.chunk_size)
     
-    def add_file(self, filepath: str, metadata: Optional[Dict[str, Any]] = None) -> List[str]:
+    def flush_db(self):
+        """Flush all data from the ChromaDB."""
+        self.chroma_manager.flush()
+        
+    def add_file(self, filepath: str, metadata: Optional[Dict[str, Any]] = None, text_content: Optional[str] = None) -> List[str]:
         """
         Process a file and add its chunks to ChromaDB.
         
         Args:
             filepath (str): Path to the file
             metadata (Optional[Dict[str, Any]]): Optional metadata for the chunks
+            text_content (Optional[str]): Optional pre-processed text content. If provided, skips file parsing
             
         Returns:
             List[str]: List of document IDs for the added chunks
         """
-        # Parse the file
-        text = self.parse_file(filepath)
-        
-        # Chunk the text
-        chunks = self.chunk_text(text)
+        if text_content is not None:
+            # Use provided text content directly
+            chunks = [text_content]  # Don't chunk pre-processed content
+        else:
+            # Parse the file and chunk it
+            text = self.parse_file(filepath)
+            chunks = self.chunk_text(text)
         
         # Add base metadata
         base_metadata = {
@@ -116,7 +109,7 @@ class EmbeddingManager:
         doc_ids = []
         for i, chunk in enumerate(chunks):
             # Add chunk index to metadata
-            chunk_metadata = {**base_metadata, 'chunk_index': i}
+            chunk_metadata = {**base_metadata}
             
             # Add to ChromaDB
             doc_id = self.chroma_manager.add_document(
