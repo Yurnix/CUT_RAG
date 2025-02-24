@@ -2,17 +2,21 @@ import streamlit as st
 import os
 from embedding_manager import EmbeddingManager
 from anthropic_rag import AnthropicRAG
+from geminy_rag import GeminyRAG
 
-# Initialize session state for chat history
+# Initialize session state for chat history and settings
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "llm_provider" not in st.session_state:
+    st.session_state.llm_provider = "anthropic"
 
 # Initialize managers
 @st.cache_resource
 def init_managers():
     embedding_manager = EmbeddingManager()
-    rag = AnthropicRAG(chroma_manager=embedding_manager.chroma_manager)
-    return embedding_manager, rag
+    anthropic_rag = AnthropicRAG(chroma_manager=embedding_manager.chroma_manager)
+    gemini_rag = GeminyRAG(chroma_manager=embedding_manager.chroma_manager)
+    return embedding_manager, anthropic_rag, gemini_rag
 
 def main():
     st.set_page_config(page_title="Cyprus University of Technology RAG", layout="wide")
@@ -27,10 +31,17 @@ def main():
     """)
     
     # Initialize managers
-    embedding_manager, rag = init_managers()
+    embedding_manager, anthropic_rag, gemini_rag = init_managers()
     
-    # Sidebar for file upload
+    # Sidebar for settings and file upload
     with st.sidebar:
+        st.header("Settings")
+        st.session_state.llm_provider = st.selectbox(
+            "Select LLM Provider",
+            ["anthropic", "gemini"],
+            index=0 if st.session_state.llm_provider == "anthropic" else 1
+        )
+        
         st.header("Document Upload")
         uploaded_file = st.file_uploader("Choose a file", type=['txt', 'pdf', 'csv'])
         
@@ -72,6 +83,8 @@ def main():
         # Get AI response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
+                # Use selected RAG implementation
+                rag = anthropic_rag if st.session_state.llm_provider == "anthropic" else gemini_rag
                 response = rag.query(prompt)
                 st.markdown(response)
                 
