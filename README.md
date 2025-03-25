@@ -70,16 +70,22 @@ The project follows SOLID principles and is organized into several key component
 
 ## Environment Setup
 
-1. Create a `.env` file with your API keys:
+1. Create a virtual environment and activate it:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install requirements:
+```bash
+pip install -r requirements.txt
+```
+
+3. Create a `.env` file with your API keys:
    ```
    ANTHROPIC_API_KEY=your_key_here
    GOOGLE_API_KEY=your_key_here
    DEEPSEEK_API_KEY=your_key_here
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
    ```
 
 ## Testing
