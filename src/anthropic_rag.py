@@ -40,6 +40,7 @@ class AnthropicRAG:
         
         # Initialize or store ChromaManager
         self.chroma_manager = chroma_manager or ChromaManager()
+        print("Intiated Anthropic")
         
     def _format_context(self, documents: List[Dict[str, Any]]) -> str:
         """

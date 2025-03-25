@@ -1,22 +1,22 @@
 from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
-import google.generativeai as genai
+import deepseek
 from chroma_manager import ChromaManager
 
-class GeminyRAG:
+class DeepseekRAG:
     def __init__(self, 
                 chroma_manager: Optional[ChromaManager] = None,
-                model: str = "gemini-2.0-flash",
+                model: str = "deepseek-chat-67b",
                 max_tokens: int = 1024,
                 temperature: float = 0.7,
                 context_limit: int = 5):
         """
-        Initialize GeminyRAG with ChromaManager for context retrieval.
+        Initialize DeepseekRAG with ChromaManager for context retrieval.
         
         Args:
             chroma_manager (Optional[ChromaManager]): ChromaManager instance. If None, creates a new one
-            model (str): Gemini model to use
+            model (str): Deepseek model to use
             max_tokens (int): Maximum tokens in response
             temperature (float): Temperature for response generation
             context_limit (int): Maximum number of similar documents to include in context
@@ -24,23 +24,21 @@ class GeminyRAG:
         # Load environment variables
         load_dotenv()
         
-        # Initialize Gemini client
-        api_key = os.getenv("GOOGLE_API_KEY")
+        # Initialize Deepseek client
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY not found in environment variables")
-        genai.configure(api_key=api_key)
+            raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
+        deepseek.api_key = api_key
         
         # Store parameters
         self.model = model
-            
-        # Store parameters
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.context_limit = context_limit
         
         # Initialize or store ChromaManager
         self.chroma_manager = chroma_manager or ChromaManager()
-        print("Intiated Geminy")
+        print("Intiated Deepseek")
         
     def _format_context(self, documents: List[Dict[str, Any]]) -> str:
         """
@@ -99,23 +97,19 @@ class GeminyRAG:
         {context}
         
         Question: {user_query}"""
-        print("### GEMINI #########################################################\n")
-
-        # Generate response using Gemini
-        model = genai.GenerativeModel(
-            model_name=self.model,
-            generation_config=genai.GenerationConfig(
-                temperature=self.temperature,
-                max_output_tokens=self.max_tokens,
-            )
+        print("### DEEPSEEK #########################################################\n")
+        print(message)
+        
+        deepseekAPI = deepseek.DeepSeekAPI(api_key=os.getenv("DEEPSEEK_API_KEY"))
+        print(deepseekAPI.get_models())
+        response = deepseekAPI.chat_completion(
+            prompt=message,
+            prompt_sys=system_prompt,
+            model=self.model,
+            stream=False
         )
         
-        # Combine system prompt and message
-        combined_prompt = f"{system_prompt}\n\n{message}"
-        print(combined_prompt)
-
-        response = model.generate_content(combined_prompt)
-        result = response.text
+        result = response.choices[0].message.content
         
         print("#########################################################\n")
         print(result)

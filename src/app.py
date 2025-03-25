@@ -3,6 +3,7 @@ import os
 from embedding_manager import EmbeddingManager
 from anthropic_rag import AnthropicRAG
 from geminy_rag import GeminyRAG
+from deepseek_rag import DeepseekRAG
 
 # Initialize session state for chat history and settings
 if "messages" not in st.session_state:
@@ -16,7 +17,8 @@ def init_managers():
     embedding_manager = EmbeddingManager()
     anthropic_rag = AnthropicRAG(chroma_manager=embedding_manager.chroma_manager)
     gemini_rag = GeminyRAG(chroma_manager=embedding_manager.chroma_manager)
-    return embedding_manager, anthropic_rag, gemini_rag
+    deepseek_rag = DeepseekRAG(chroma_manager=embedding_manager.chroma_manager)
+    return embedding_manager, anthropic_rag, gemini_rag, deepseek_rag
 
 def main():
     st.set_page_config(page_title="Cyprus University of Technology RAG", layout="wide")
@@ -31,14 +33,14 @@ def main():
     """)
     
     # Initialize managers
-    embedding_manager, anthropic_rag, gemini_rag = init_managers()
+    embedding_manager, anthropic_rag, gemini_rag, deepseek_rag = init_managers()
     
     # Sidebar for settings and file upload
     with st.sidebar:
         st.header("Settings")
         st.session_state.llm_provider = st.selectbox(
             "Select LLM Provider",
-            ["anthropic", "gemini"],
+            ["anthropic", "gemini", "deepseek"],
             index=0 if st.session_state.llm_provider == "anthropic" else 1
         )
         
@@ -84,7 +86,12 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 # Use selected RAG implementation
-                rag = anthropic_rag if st.session_state.llm_provider == "anthropic" else gemini_rag
+                if st.session_state.llm_provider == "anthropic":
+                    rag = anthropic_rag
+                elif st.session_state.llm_provider == "gemini":
+                    rag = gemini_rag
+                else:
+                    rag = deepseek_rag
                 response = rag.query(prompt)
                 st.markdown(response)
                 
