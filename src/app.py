@@ -96,11 +96,16 @@ def main():
                     rag = gemini_rag
                 else:
                     rag = deepseek_rag
-                response = rag.query(prompt)
-                st.markdown(response)
-                
-                # Add assistant response to chat history
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                try:
+                    response = rag.query(prompt)
+                    st.markdown(response)
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                except Exception as e:
+                    error_message = "An error has occurred, please try again later. If the error persists, contact the administrator."
+                    st.error(error_message)
+                    # Add error message to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": error_message})
     
     # Clear chat button
     if st.button("Clear Chat"):
