@@ -91,6 +91,47 @@ class ChromaManager(IEmbeddingManager):
             
         return formatted_results
     
+    def delete_documents_by_metadata(self, metadata_key: str, metadata_value: Any) -> None:
+        """
+        Delete all documents that match the given metadata key-value pair.
+        
+        Args:
+            metadata_key (str): Metadata key to match
+            metadata_value (Any): Value to match for the given key
+        """
+        # Get all documents with matching metadata
+        results = self.collection.get(
+            where={metadata_key: metadata_value}
+        )
+        
+        if results["ids"]:
+            self.collection.delete(ids=results["ids"])
+            
+    def get_documents_by_metadata(self, metadata_key: str, metadata_value: Any) -> List[Dict[str, Any]]:
+        """
+        Get all documents that match the given metadata key-value pair.
+        
+        Args:
+            metadata_key (str): Metadata key to match
+            metadata_value (Any): Value to match for the given key
+            
+        Returns:
+            List[Dict[str, Any]]: List of matching documents with their metadata
+        """
+        results = self.collection.get(
+            where={metadata_key: metadata_value}
+        )
+        
+        formatted_results = []
+        for i in range(len(results["ids"])):
+            formatted_results.append({
+                'id': results["ids"][i],
+                'document': results["documents"][i],
+                'metadata': results["metadatas"][i]
+            })
+            
+        return formatted_results
+    
     def flush(self) -> None:
         """
         Delete all documents from the collection.
