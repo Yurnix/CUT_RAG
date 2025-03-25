@@ -4,6 +4,8 @@ from watchdog.events import FileSystemEventHandler
 import os
 from embedding_manager import EmbeddingManager
 from pdf_chunker import PdfChunker
+from interfaces import IChunker
+from typing import Optional
 import logging
 import argparse
 
@@ -14,7 +16,7 @@ logging.basicConfig(
 )
 
 class DocumentHandler(FileSystemEventHandler):
-    def __init__(self, embedding_manager: EmbeddingManager, use_pdf_chunker: bool = False, flush_database: bool = False):
+    def __init__(self, embedding_manager: EmbeddingManager, chunker: Optional[IChunker] = None, flush_database: bool = False):
         """
         Initialize document handler with EmbeddingManager.
         
@@ -23,8 +25,7 @@ class DocumentHandler(FileSystemEventHandler):
         """
         self.embedding_manager = embedding_manager
         self.processed_files = set()  # Track processed files to avoid duplicates
-        self.use_pdf_chunker = use_pdf_chunker
-        self.pdf_chunker = PdfChunker() if use_pdf_chunker else None
+        self.chunker = chunker or PdfChunker()  # Use PdfChunker by default
         if flush_database:
             self.embedding_manager.flush_db()
         
@@ -46,30 +47,11 @@ class DocumentHandler(FileSystemEventHandler):
                 
             logging.info(f"Processing file: {file_path}")
             
-            # Use PDF Chunker for PDF files if enabled
-            if self.use_pdf_chunker and file_path.lower().endswith('.pdf'):
-                chunks = self.pdf_chunker.chunk_pdf(file_path)
-                doc_ids = []
-                for chunk in chunks:
-                    # Create metadata dictionary combining PDF metadata with source
-                    metadata = {
-                        'source': os.path.basename(file_path),
-                        'page_number': chunk.metadata.page_number,
-                        'text_hash': chunk.metadata.text_hash
-                    }
-                    # Add the chunk with its metadata
-                    chunk_doc_ids = self.embedding_manager.add_file(
-                        file_path,
-                        metadata=metadata,
-                        text_content=chunk.text  # Pass the chunk text directly
-                    )
-                    doc_ids.extend(chunk_doc_ids)
-            else:
-                # Use standard processing for other files
-                doc_ids = self.embedding_manager.add_file(
-                    file_path,
-                    metadata={'source': os.path.basename(file_path)}
-                )
+            # Process the file using the appropriate chunker
+            doc_ids = self.embedding_manager.add_file(
+                file_path,
+                metadata={'source': os.path.basename(file_path)}
+            )
             self.processed_files.add(file_path)
             logging.info(f"Successfully processed {file_path}. Added {len(doc_ids)} chunks.")
             
@@ -87,26 +69,76 @@ class DocumentHandler(FileSystemEventHandler):
             self._process_file(event.src_path)
 
 class DocumentWatcher:
-    def __init__(self, watch_directory: str = "Docs", use_pdf_chunker: bool = False, flush_database: bool = False):
+    def __init__(self, watch_directory: str = "Docs", chunker: Optional[IChunker] = None, 
+                 flush_database: bool = False, embed_existing: bool = False):
         """
         Initialize document watcher service.
         
         Args:
             watch_directory (str): Directory to monitor for changes
+            chunker (Optional[IChunker]): Optional custom chunker implementation
+            flush_database (bool): Whether to flush the database on start
+            embed_existing (bool): Whether to embed existing files in the directory
         """
         self.watch_directory = watch_directory
+        self.embed_existing = embed_existing
         
         # Initialize managers and ensure collection exists
         self.embedding_manager = EmbeddingManager()
         # Ensure collection exists by accessing it
         _ = self.embedding_manager.chroma_manager.create_collection()
         
-        self.event_handler = DocumentHandler(self.embedding_manager, use_pdf_chunker, flush_database)
+        self.event_handler = DocumentHandler(self.embedding_manager, chunker, flush_database)
         self.observer = Observer()
+        
+    def _list_existing_files(self):
+        """List existing files in the watch directory."""
+        if not os.path.exists(self.watch_directory):
+            os.makedirs(self.watch_directory)
+            logging.info(f"Created directory: {self.watch_directory}")
+            return
+            
+        supported_files = []
+        unsupported_files = []
+        
+        for filename in os.listdir(self.watch_directory):
+            file_path = os.path.join(self.watch_directory, filename)
+            if os.path.isfile(file_path):
+                if self.event_handler._is_supported_file(file_path):
+                    supported_files.append(filename)
+                else:
+                    unsupported_files.append(filename)
+        
+        if supported_files:
+            logging.info("Found supported files:")
+            for filename in supported_files:
+                logging.info(f"  - {filename}")
+        
+        if unsupported_files:
+            logging.info("Found unsupported files:")
+            for filename in unsupported_files:
+                logging.info(f"  - {filename}")
+                
+        return supported_files, unsupported_files
+    
+    def _process_existing_files(self):
+        """Process existing files if embed_existing is True."""
+        if not os.path.exists(self.watch_directory):
+            os.makedirs(self.watch_directory)
+            logging.info(f"Created directory: {self.watch_directory}")
+            return
+            
+        supported_files, _ = self._list_existing_files()
+        
+        if self.embed_existing and supported_files:
+            logging.info("Embedding existing files...")
+            for filename in supported_files:
+                file_path = os.path.join(self.watch_directory, filename)
+                self.event_handler._process_file(file_path)
         
     def start(self):
         """Start the document watcher service."""
-        # Process existing files
+        # Process or list existing files
         self._process_existing_files()
         
         # Start watching for new changes
@@ -122,24 +154,12 @@ class DocumentWatcher:
             logging.info("Stopped watching directory")
         
         self.observer.join()
-    
-    def _process_existing_files(self):
-        """Process any existing files in the watch directory."""
-        if not os.path.exists(self.watch_directory):
-            os.makedirs(self.watch_directory)
-            logging.info(f"Created directory: {self.watch_directory}")
-            return
-            
-        for filename in os.listdir(self.watch_directory):
-            file_path = os.path.join(self.watch_directory, filename)
-            if os.path.isfile(file_path):
-                self.event_handler._process_file(file_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Document Watcher Service')
-    parser.add_argument('--pdf_chunker', action='store_true', help='Use PDF Chunker for PDF files')
     parser.add_argument('--flush_database', action='store_true', help='Flush the ChromaDB before starting')
+    parser.add_argument('--embed_existing', action='store_true', help='Embed existing files in the directory')
     args = parser.parse_args()
     
-    watcher = DocumentWatcher(use_pdf_chunker=args.pdf_chunker, flush_database=args.flush_database)
+    watcher = DocumentWatcher(flush_database=args.flush_database, embed_existing=args.embed_existing)
     watcher.start()

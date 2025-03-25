@@ -1,9 +1,8 @@
 import streamlit as st
 import os
 from embedding_manager import EmbeddingManager
-from anthropic_rag import AnthropicRAG
-from geminy_rag import GeminyRAG
-from deepseek_rag import DeepseekRAG
+from rag_implementations import RAG
+from llm_implementations import AnthropicLLM, GeminiLLM, DeepseekLLM
 
 # Initialize session state for chat history and settings
 if "messages" not in st.session_state:
@@ -15,9 +14,14 @@ if "llm_provider" not in st.session_state:
 @st.cache_resource
 def init_managers():
     embedding_manager = EmbeddingManager()
-    anthropic_rag = AnthropicRAG(chroma_manager=embedding_manager.chroma_manager)
-    gemini_rag = GeminyRAG(chroma_manager=embedding_manager.chroma_manager)
-    deepseek_rag = DeepseekRAG(chroma_manager=embedding_manager.chroma_manager)
+    anthropic_llm = AnthropicLLM()
+    gemini_llm = GeminiLLM()
+    deepseek_llm = DeepseekLLM()
+    
+    anthropic_rag = RAG(llm=anthropic_llm, embedding_manager=embedding_manager.chroma_manager)
+    gemini_rag = RAG(llm=gemini_llm, embedding_manager=embedding_manager.chroma_manager)
+    deepseek_rag = RAG(llm=deepseek_llm, embedding_manager=embedding_manager.chroma_manager)
+    
     return embedding_manager, anthropic_rag, gemini_rag, deepseek_rag
 
 def main():
