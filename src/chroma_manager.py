@@ -2,8 +2,9 @@ import chromadb
 from chromadb.config import Settings
 from typing import List, Optional, Dict, Any
 import uuid
+from interfaces import IEmbeddingManager
 
-class ChromaManager:
+class ChromaManager(IEmbeddingManager):
     def __init__(self, persist_directory: str = "./chroma_db"):
         """
         Initialize ChromaDB manager with optional persistence directory.

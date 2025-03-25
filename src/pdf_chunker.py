@@ -1,21 +1,10 @@
 import re
 import hashlib
-from typing import List, Dict, Any
+from typing import List
 from pypdf import PdfReader
-from dataclasses import dataclass
+from interfaces import IChunker, ChunkMetadata, TextChunk
 
-@dataclass
-class ChunkMetadata:
-    file_name: str
-    page_number: int
-    text_hash: str
-
-@dataclass
-class TextChunk:
-    text: str
-    metadata: ChunkMetadata
-
-class PdfChunker:
+class PdfChunker(IChunker):
     def __init__(self):
         pass
 
@@ -23,7 +12,7 @@ class PdfChunker:
         """Create a hash for the text content."""
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
-    def chunk_pdf(self, pdf_path: str) -> List[TextChunk]:
+    def chunk_document(self, file_path: str) -> List[TextChunk]:
         """
         Parse PDF and return chunks with metadata.
         
@@ -34,8 +23,8 @@ class PdfChunker:
             List of TextChunk objects containing the text and metadata
         """
         chunks = []
-        reader = PdfReader(pdf_path)
-        file_name = pdf_path.split('/')[-1]
+        reader = PdfReader(file_path)
+        file_name = file_path.split('/')[-1]
         
         for page_num, page in enumerate(reader.pages, 1):
             text = page.extract_text()
