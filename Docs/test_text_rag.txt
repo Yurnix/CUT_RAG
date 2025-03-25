@@ -1,8 +1,0 @@
-Spesific to Computer Architecture Course:
-
-The teacher name is Andreas Diavastos, any questions about the course should be addressed to him.
-The Midterm Exam for Computer Architecture is on 14/03/2025 5 pm at Drakos building, floor 2 room 201.
-The Final Exam for Computer Architecture is on 15/05/2025 2 pm at Andreas Themistokleous building, ground floor, room 1.
-The Course main book is Computer Architecture 6th edition by John Hennessy and David Patterson.  
-
-For any Platform issues, one should contact Konyk Yuriy 
