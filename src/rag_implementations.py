@@ -8,8 +8,9 @@ class RAG(BaseRAG):
     def __init__(self,
                  llm: ILLM,
                  embedding_manager: Optional[IEmbeddingManager] = None,
-                 context_limit: int = 5):
+                 context_limit: int = 5,
+                 use_query_preprocessing: bool = False):
         if embedding_manager is None:
             embedding_manager = ChromaManager()
             
-        super().__init__(llm, embedding_manager, context_limit)
+        super().__init__(llm, embedding_manager, context_limit, use_query_preprocessing)
