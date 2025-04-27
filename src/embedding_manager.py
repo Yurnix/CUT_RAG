@@ -20,11 +20,29 @@ class EmbeddingManager:
         self.pdf_chunker = chunker or PdfChunker()
         self.text_chunker = TextChunker()
     
-    def flush_db(self):
-        """Flush all data from the ChromaDB."""
-        self.chroma_manager.flush()
+    def flush_db(self, collection_name: Optional[str] = None):
+        """
+        Flush data from the ChromaDB.
         
-    def add_file(self, filepath: str, metadata: Optional[Dict[str, Any]] = None, text_content: Optional[str] = None) -> List[str]:
+        Args:
+            collection_name (Optional[str]): Name of the collection to flush. If None, flushes default collection.
+        """
+        self.chroma_manager.flush(collection_name)
+    
+    def get_topics(self) -> List[str]:
+        """
+        Get a list of available topics (collections) in the database,
+        except the default collection.
+        
+        Returns:
+            List[str]: List of topic names
+        """
+        collections = self.chroma_manager.list_collections()
+        # Filter out the default collection
+        return [c for c in collections if c != self.chroma_manager.default_collection_name]
+        
+    def add_file(self, filepath: str, metadata: Optional[Dict[str, Any]] = None, 
+                text_content: Optional[str] = None, collection_name: Optional[str] = None) -> List[str]:
         """
         Process a file and add its chunks to ChromaDB.
         
@@ -32,6 +50,7 @@ class EmbeddingManager:
             filepath (str): Path to the file
             metadata (Optional[Dict[str, Any]]): Optional metadata for the chunks
             text_content (Optional[str]): Optional pre-processed text content. If provided, skips file parsing
+            collection_name (Optional[str]): Name of the collection to add chunks to
             
         Returns:
             List[str]: List of document IDs for the added chunks
@@ -72,10 +91,11 @@ class EmbeddingManager:
                 'text_hash': chunk.metadata.text_hash
             })
             
-            # Add to ChromaDB
+            # Add to ChromaDB with optional collection name
             doc_id = self.chroma_manager.add_document(
                 document=chunk.text,
-                metadata=chunk_metadata
+                metadata=chunk_metadata,
+                collection_name=collection_name
             )
             doc_ids.append(doc_id)
         

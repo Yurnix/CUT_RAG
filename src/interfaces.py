@@ -63,6 +63,8 @@ class BaseRAG:
         self.context_limit = context_limit
         self.use_query_preprocessing = use_query_preprocessing
         self.query_preprocessor = None
+        self.selected_topics = []  # Default to no specific topics (use default collection)
+        self.results_per_topic = 2  # Default number of results to fetch per topic
         
         # If query preprocessing is enabled, initialize the preprocessor
         if self.use_query_preprocessing:
@@ -75,12 +77,27 @@ class BaseRAG:
         
         for doc in documents:
             metadata_str = ", ".join(f"{k}: {v}" for k, v in doc['metadata'].items())
+            # Include collection/topic name if available
+            collection_info = f", Topic: {doc.get('collection', 'default')}" if 'collection' in doc else ""
+            
             context_parts.append(
-                f"[Document (Distance: {doc['distance']:.4f}, {metadata_str})]\n"
+                f"[Document (Distance: {doc['distance']:.4f}{collection_info}, {metadata_str})]\n"
                 f"{doc['document']}\n"
             )
             
         return "\n".join(context_parts)
+    
+    def set_selected_topics(self, topics: List[str], results_per_topic: int = None):
+        """
+        Set the topics to query from.
+        
+        Args:
+            topics (List[str]): List of topic names that correspond to collection names
+            results_per_topic (int, optional): Number of results to retrieve per topic
+        """
+        self.selected_topics = topics
+        if results_per_topic is not None:
+            self.results_per_topic = results_per_topic
     
     def query(self, user_query: str, system_prompt: Optional[str] = None, history: str = "", 
               chat_history: List[Tuple[str, str]] = None) -> str:
@@ -102,10 +119,20 @@ class BaseRAG:
             print("--------------------------------\n")
         
         # Get similar documents using the (potentially enriched) query
-        similar_docs = self.embedding_manager.query_similar(
-            query_text=search_query,
-            n_results=self.context_limit
-        )
+        if self.selected_topics:
+            print(f"Querying selected topics: {', '.join(self.selected_topics)}")
+            similar_docs = self.embedding_manager.query_similar(
+                query_text=search_query,
+                n_results=self.context_limit,
+                collection_names=self.selected_topics,
+                results_per_collection=self.results_per_topic
+            )
+        else:
+            # If no topics selected, use default collection
+            similar_docs = self.embedding_manager.query_similar(
+                query_text=search_query,
+                n_results=self.context_limit
+            )
         
         context = self._format_context(similar_docs)
         

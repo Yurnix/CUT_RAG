@@ -1,0 +1,11 @@
+# Requirements for RAG Quality Evaluation Tools
+# These are in addition to the main project requirements
+
+# Already in main requirements but listed here for clarity
+anthropic>=0.45.2
+chromadb>=0.6.3
+python-dotenv>=1.0.0
+pandas>=2.2.0
+
+# Visualization requirements
+matplotlib>=3.7.0

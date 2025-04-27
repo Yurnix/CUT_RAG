@@ -30,6 +30,19 @@ class DocumentHandler(FileSystemEventHandler):
         self.text_chunker = TextChunker()
         self.processing_timers: Dict[str, Timer] = {}
         self.DEBOUNCE_SECONDS = 1  # Wait for 1 second of no events before processing
+    
+    def _get_topic_from_path(self, file_path: str) -> Optional[str]:
+        """
+        Extract topic name from file path.
+        
+        Returns:
+            Optional[str]: Topic name or None if not in a topic directory
+        """
+        # Checks if the file is inside a subfolder of the Docs directory
+        parts = os.path.normpath(file_path).split(os.sep)
+        if len(parts) >= 3 and parts[-3] == "Docs":
+            return parts[-2]
+        return None
         
     def _is_supported_file(self, file_path: str) -> bool:
         """Check if the file type is supported."""
@@ -47,8 +60,16 @@ class DocumentHandler(FileSystemEventHandler):
     def _remove_file_chunks(self, file_path: str):
         """Remove all chunks associated with a file."""
         file_name = os.path.basename(file_path)
-        logging.info(f"Removing existing chunks for {file_name}")
-        self.embedding_manager.chroma_manager.delete_documents_by_metadata('source', file_name)
+        topic = self._get_topic_from_path(file_path)
+        
+        logging.info(f"Removing existing chunks for {file_name}" + (f" from topic {topic}" if topic else ""))
+        
+        if topic:
+            # Remove from topic-specific collection
+            self.embedding_manager.chroma_manager.delete_documents_by_metadata('source', file_name, topic)
+        else:
+            # Remove from default collection
+            self.embedding_manager.chroma_manager.delete_documents_by_metadata('source', file_name)
         
     def _process_file(self, file_path: str):
         """Process a file using EmbeddingManager."""
@@ -58,11 +79,12 @@ class DocumentHandler(FileSystemEventHandler):
                 return
             
             file_name = os.path.basename(file_path)
+            topic = self._get_topic_from_path(file_path)
             
             # Always remove existing chunks first
             self._remove_file_chunks(file_path)
             
-            logging.info(f"Processing file: {file_path}")
+            logging.info(f"Processing file: {file_path}" + (f" for topic {topic}" if topic else ""))
             
             # Get chunks using appropriate chunker
             chunker = self._get_chunker_for_file(file_path)
@@ -74,13 +96,16 @@ class DocumentHandler(FileSystemEventHandler):
                 chunk_id = self.embedding_manager.add_file(
                     file_path,
                     metadata={
-                        'source': file_name
+                        'source': file_name,
+                        'topic': topic if topic else 'default'
                     },
-                    text_content=chunk.text
+                    text_content=chunk.text,
+                    collection_name=topic  # Use topic name as collection name if available
                 )
                 doc_ids.extend(chunk_id)
             
-            logging.info(f"Successfully processed {file_path}. Added {len(doc_ids)} chunks.")
+            logging.info(f"Successfully processed {file_path}. Added {len(doc_ids)} chunks to " + 
+                        (f"topic {topic}" if topic else "default collection"))
             
         except Exception as e:
             logging.error(f"Error processing {file_path}: {str(e)}")
@@ -143,22 +168,36 @@ class DocumentWatcher:
         self.observer = Observer()
         
     def _list_existing_files(self):
-        """List existing files in the watch directory."""
+        """List existing files in the watch directory and its subdirectories."""
         if not os.path.exists(self.watch_directory):
             os.makedirs(self.watch_directory)
             logging.info(f"Created directory: {self.watch_directory}")
-            return [], []
+            return [], [], []
             
         supported_files = []
         unsupported_files = []
+        topic_dirs = []
         
-        for filename in os.listdir(self.watch_directory):
-            file_path = os.path.join(self.watch_directory, filename)
-            if os.path.isfile(file_path):
+        # First check for topic directories
+        for item in os.listdir(self.watch_directory):
+            item_path = os.path.join(self.watch_directory, item)
+            if os.path.isdir(item_path):
+                topic_dirs.append(item)
+        
+        if topic_dirs:
+            logging.info(f"Found topic directories: {', '.join(topic_dirs)}")
+        
+        # Then check for files in both main directory and topic subdirectories
+        for root, _, files in os.walk(self.watch_directory):
+            for filename in files:
+                file_path = os.path.join(root, filename)
                 if self.event_handler._is_supported_file(file_path):
-                    supported_files.append(filename)
+                    # Store relative path from watch_directory
+                    rel_path = os.path.relpath(file_path, self.watch_directory)
+                    supported_files.append(rel_path)
                 else:
-                    unsupported_files.append(filename)
+                    rel_path = os.path.relpath(file_path, self.watch_directory)
+                    unsupported_files.append(rel_path)
         
         if supported_files:
             logging.info("Found supported files:")
@@ -170,7 +209,7 @@ class DocumentWatcher:
             for filename in unsupported_files:
                 logging.info(f"  - {filename}")
                 
-        return supported_files, unsupported_files
+        return supported_files, unsupported_files, topic_dirs
     
     def _process_existing_files(self):
         """Process existing files if embed_existing is True."""
@@ -179,12 +218,12 @@ class DocumentWatcher:
             logging.info(f"Created directory: {self.watch_directory}")
             return
             
-        supported_files, _ = self._list_existing_files()
+        supported_files, _, topic_dirs = self._list_existing_files()
         
         if self.embed_existing and supported_files:
             logging.info("Embedding existing files...")
-            for filename in supported_files:
-                file_path = os.path.join(self.watch_directory, filename)
+            for rel_path in supported_files:
+                file_path = os.path.join(self.watch_directory, rel_path)
                 # Process existing files directly without debouncing
                 self.event_handler._process_file(file_path)
         
@@ -194,9 +233,9 @@ class DocumentWatcher:
         self._process_existing_files()
         
         # Start watching for new changes
-        self.observer.schedule(self.event_handler, self.watch_directory, recursive=False)
+        self.observer.schedule(self.event_handler, self.watch_directory, recursive=True)
         self.observer.start()
-        logging.info(f"Started watching directory: {self.watch_directory}")
+        logging.info(f"Started watching directory: {self.watch_directory} (including subdirectories)")
         
         try:
             while True:
